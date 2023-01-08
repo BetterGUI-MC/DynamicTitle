@@ -1,6 +1,7 @@
 package me.hsgamer.bettergui.dynamictitle;
 
 import me.hsgamer.bettergui.builder.InventoryBuilder;
+import me.hsgamer.bettergui.util.MapUtil;
 import me.hsgamer.hscore.bukkit.addon.PluginAddon;
 import me.hsgamer.hscore.bukkit.gui.GUIDisplay;
 import me.hsgamer.hscore.bukkit.gui.GUIHolder;
@@ -27,7 +28,10 @@ public final class DynamicTitle extends PluginAddon implements Listener {
     @Override
     public void onEnable() {
         InventoryBuilder.INSTANCE.register(map -> {
-            long period = Optional.ofNullable(map.get("title-period")).map(String::valueOf).map(Long::parseLong).orElse(-1L);
+            long period = Optional.ofNullable(MapUtil.getIfFound(map, "title-period", "title-update"))
+                    .map(String::valueOf)
+                    .map(Long::parseLong)
+                    .orElse(0L);
             return (display, uuid) -> {
                 GUIHolder holder = display.getHolder();
                 InventoryType type = holder.getInventoryType();
