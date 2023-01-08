@@ -2,6 +2,7 @@ package me.hsgamer.bettergui.dynamictitle;
 
 import me.hsgamer.bettergui.builder.InventoryBuilder;
 import me.hsgamer.hscore.bukkit.addon.PluginAddon;
+import me.hsgamer.hscore.bukkit.gui.GUIDisplay;
 import me.hsgamer.hscore.bukkit.gui.GUIHolder;
 import me.hsgamer.hscore.bukkit.gui.GUIUtils;
 import org.bukkit.Bukkit;
@@ -10,17 +11,18 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.InventoryHolder;
+import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 
-import java.util.IdentityHashMap;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 public final class DynamicTitle extends PluginAddon implements Listener {
-    private final Map<Inventory, BukkitTask> inventoryTaskMap = new IdentityHashMap<>();
+    private final Map<Inventory, Long> inventoryMap = new IdentityHashMap<>();
+    private final Set<BukkitTask> tasks = new HashSet<>();
 
     @Override
     public void onEnable() {
@@ -36,16 +38,7 @@ public final class DynamicTitle extends PluginAddon implements Listener {
                         : Bukkit.createInventory(display, type, title);
 
                 if (period >= 0) {
-                    inventoryTaskMap.put(inventory, Bukkit.getScheduler().runTaskTimer(getPlugin(), () -> {
-                        String newTitle = holder.getTitle(uuid);
-                        if (!newTitle.equals(title)) {
-                            for (HumanEntity viewer : inventory.getViewers()) {
-                                if (viewer instanceof Player) {
-                                    InventoryUpdate.updateInventory((Player) viewer, newTitle);
-                                }
-                            }
-                        }
-                    }, period, period));
+                    inventoryMap.put(inventory, period);
                 }
 
                 return inventory;
@@ -55,23 +48,43 @@ public final class DynamicTitle extends PluginAddon implements Listener {
         Bukkit.getPluginManager().registerEvents(this, getPlugin());
     }
 
-    private void clearAll() {
-        inventoryTaskMap.values().forEach(BukkitTask::cancel);
-        inventoryTaskMap.clear();
-    }
-
     @Override
     public void onReload() {
-        clearAll();
+        inventoryMap.clear();
     }
 
     @Override
     public void onDisable() {
-        clearAll();
+        tasks.forEach(BukkitTask::cancel);
+        tasks.clear();
+        inventoryMap.clear();
     }
 
-    @EventHandler(priority = EventPriority.LOWEST)
-    public void onInventoryClose(InventoryCloseEvent event) {
-        Optional.ofNullable(inventoryTaskMap.remove(event.getInventory())).ifPresent(BukkitTask::cancel);
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onInventoryOpen(InventoryOpenEvent event) {
+        Inventory inventory = event.getInventory();
+        if (!inventoryMap.containsKey(inventory)) return;
+        InventoryHolder holder = event.getInventory().getHolder();
+        if (!(holder instanceof GUIDisplay)) return;
+        GUIDisplay display = (GUIDisplay) holder;
+        HumanEntity entity = event.getPlayer();
+        if (!(entity instanceof Player)) return;
+        Player player = (Player) entity;
+
+        long period = inventoryMap.get(inventory);
+        BukkitRunnable runnable = new BukkitRunnable() {
+            @Override
+            public void run() {
+                if (!player.isOnline() || !player.isValid() || player.getOpenInventory().getTopInventory() != inventory) {
+                    cancel();
+                    return;
+                }
+                String title = display.getHolder().getTitle(player.getUniqueId());
+                if (!title.equals(inventory.getTitle())) {
+                    InventoryUpdate.updateInventory(player, title);
+                }
+            }
+        };
+        tasks.add(runnable.runTaskTimer(getPlugin(), period, period));
     }
 }
