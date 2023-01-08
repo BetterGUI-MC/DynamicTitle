@@ -50,7 +50,7 @@ public final class DynamicTitle extends PluginAddon implements Listener {
 
                 return inventory;
             };
-        });
+        }, "dynamic-title");
 
         Bukkit.getPluginManager().registerEvents(this, getPlugin());
     }
