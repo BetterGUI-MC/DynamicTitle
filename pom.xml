@@ -10,15 +10,16 @@
     <version>1.0</version>
   </parent>
 
-  <artifactId>ExampleAddon</artifactId>
+  <artifactId>DynamicTitle</artifactId>
   <version>1.0-SNAPSHOT</version>
   <packaging>jar</packaging>
 
-  <name>ExampleAddon</name>
-  <description>An Example addon for BetterGUI</description>
+  <name>DynamicTitle</name>
+  <description>An addon to enable refreshing inventory title</description>
 
   <properties>
-    <project.mainClass>me.hsgamer.bettergui.exampleaddon.ExampleAddon</project.mainClass>
+    <plugin.version>7.3</plugin.version>
+    <project.mainClass>me.hsgamer.bettergui.dynamictitle.DynamicTitle</project.mainClass>
   </properties>
 
   <repositories>
