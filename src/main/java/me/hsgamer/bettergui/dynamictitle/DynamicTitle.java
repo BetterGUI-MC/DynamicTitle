@@ -80,9 +80,7 @@ public final class DynamicTitle extends PluginAddon implements Listener {
                     return;
                 }
                 String title = display.getHolder().getTitle(player.getUniqueId());
-                if (!title.equals(inventory.getTitle())) {
-                    InventoryUpdate.updateInventory(player, title);
-                }
+                InventoryUpdate.updateInventory(player, title);
             }
         };
         tasks.add(runnable.runTaskTimer(getPlugin(), period, period));
