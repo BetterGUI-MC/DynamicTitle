@@ -18,7 +18,6 @@
   <description>An addon to enable refreshing inventory title</description>
 
   <properties>
-    <plugin.version>7.3</plugin.version>
     <project.mainClass>me.hsgamer.bettergui.dynamictitle.DynamicTitle</project.mainClass>
   </properties>
 
