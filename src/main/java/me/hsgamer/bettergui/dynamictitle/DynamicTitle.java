@@ -2,10 +2,12 @@ package me.hsgamer.bettergui.dynamictitle;
 
 import me.hsgamer.bettergui.builder.InventoryBuilder;
 import me.hsgamer.bettergui.util.MapUtil;
+import me.hsgamer.bettergui.util.StringReplacerApplier;
 import me.hsgamer.hscore.bukkit.addon.PluginAddon;
 import me.hsgamer.hscore.bukkit.gui.GUIDisplay;
 import me.hsgamer.hscore.bukkit.gui.GUIHolder;
 import me.hsgamer.hscore.bukkit.gui.GUIUtils;
+import me.hsgamer.hscore.common.CollectionUtils;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.HumanEntity;
 import org.bukkit.entity.Player;
@@ -20,9 +22,11 @@ import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public final class DynamicTitle extends PluginAddon implements Listener {
-    private final Map<Inventory, Long> inventoryMap = new IdentityHashMap<>();
+    private static final String ORIGINAL_KEY = "%original%";
+    private final Map<Inventory, InventoryUpdateData> inventoryMap = new IdentityHashMap<>();
     private final Set<BukkitTask> tasks = new HashSet<>();
 
     @Override
@@ -32,6 +36,11 @@ public final class DynamicTitle extends PluginAddon implements Listener {
                     .map(String::valueOf)
                     .map(Long::parseLong)
                     .orElse(0L);
+            List<String> template = Optional.ofNullable(MapUtil.getIfFound(map, "title-template"))
+                    .map(o -> CollectionUtils.createStringListFromObject(o, false))
+                    .orElse(Collections.singletonList(ORIGINAL_KEY));
+            InventoryUpdateData data = new InventoryUpdateData(period, template);
+
             return (display, uuid) -> {
                 GUIHolder holder = display.getHolder();
                 InventoryType type = holder.getInventoryType();
@@ -41,8 +50,8 @@ public final class DynamicTitle extends PluginAddon implements Listener {
                         ? Bukkit.createInventory(display, GUIUtils.normalizeToChestSize(size), title)
                         : Bukkit.createInventory(display, type, title);
 
-                if (period >= 0) {
-                    inventoryMap.put(inventory, period);
+                if (data.period >= 0) {
+                    inventoryMap.put(inventory, data);
                 }
 
                 return inventory;
@@ -85,18 +94,40 @@ public final class DynamicTitle extends PluginAddon implements Listener {
         if (!(entity instanceof Player)) return;
         Player player = (Player) entity;
 
-        long period = inventoryMap.get(inventory);
+        InventoryUpdateData data = inventoryMap.get(inventory);
         BukkitRunnable runnable = new BukkitRunnable() {
+            private final AtomicInteger index = new AtomicInteger(0);
+
             @Override
             public void run() {
                 if (!player.isOnline() || !player.isValid() || player.getOpenInventory().getTopInventory() != inventory) {
                     cancel();
                     return;
                 }
-                String title = display.getHolder().getTitle(player.getUniqueId());
+                int currentIndex = index.getAndIncrement();
+                if (currentIndex >= data.template.size()) {
+                    index.set(1);
+                    currentIndex = 0;
+                }
+                String title = data.template.get(currentIndex);
+                if (title.equals(ORIGINAL_KEY)) {
+                    title = display.getHolder().getTitle(player.getUniqueId());
+                } else {
+                    title = StringReplacerApplier.replace(title, player.getUniqueId(), true);
+                }
                 InventoryUpdate.updateInventory(player, title);
             }
         };
-        tasks.add(runnable.runTaskTimer(getPlugin(), period, period));
+        tasks.add(runnable.runTaskTimer(getPlugin(), data.period, data.period));
+    }
+
+    private static final class InventoryUpdateData {
+        private final long period;
+        private final List<String> template;
+
+        private InventoryUpdateData(long period, List<String> template) {
+            this.period = period;
+            this.template = template;
+        }
     }
 }
