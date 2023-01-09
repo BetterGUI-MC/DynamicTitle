@@ -3,6 +3,7 @@ package me.hsgamer.bettergui.dynamictitle;
 import me.hsgamer.bettergui.api.menu.Menu;
 import me.hsgamer.bettergui.builder.InventoryBuilder;
 import me.hsgamer.bettergui.util.MapUtil;
+import me.hsgamer.bettergui.util.StringReplacerApplier;
 import me.hsgamer.hscore.bukkit.addon.PluginAddon;
 import me.hsgamer.hscore.bukkit.gui.GUIDisplay;
 import me.hsgamer.hscore.bukkit.gui.GUIHolder;
@@ -114,7 +115,7 @@ public final class DynamicTitle extends PluginAddon implements Listener {
                 String title = data.template.get(currentIndex);
                 String originalTitle = display.getHolder().getTitle(player.getUniqueId());
                 title = title.replace(ORIGINAL_KEY, originalTitle);
-                title = data.menu.replace(title, player.getUniqueId());
+                title = StringReplacerApplier.replace(title, player.getUniqueId(), data.menu);
                 InventoryUpdate.updateInventory(player, title);
             }
         };
