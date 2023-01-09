@@ -52,16 +52,26 @@ public final class DynamicTitle extends PluginAddon implements Listener {
         Bukkit.getPluginManager().registerEvents(this, getPlugin());
     }
 
-    @Override
-    public void onReload() {
+    private void clearAll() {
+        tasks.forEach(task -> {
+            try {
+                task.cancel();
+            } catch (Exception ignored) {
+                // IGNORED
+            }
+        });
+        tasks.clear();
         inventoryMap.clear();
     }
 
     @Override
+    public void onReload() {
+        clearAll();
+    }
+
+    @Override
     public void onDisable() {
-        tasks.forEach(BukkitTask::cancel);
-        tasks.clear();
-        inventoryMap.clear();
+        clearAll();
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
