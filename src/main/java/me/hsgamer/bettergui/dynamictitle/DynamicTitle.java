@@ -118,7 +118,7 @@ public final class DynamicTitle extends PluginAddon implements Listener {
                 InventoryUpdate.updateInventory(player, title);
             }
         };
-        tasks.add(runnable.runTaskTimer(getPlugin(), data.period, data.period));
+        tasks.add(runnable.runTaskTimer(getPlugin(), 0, data.period));
     }
 
     private static final class InventoryUpdateData {
