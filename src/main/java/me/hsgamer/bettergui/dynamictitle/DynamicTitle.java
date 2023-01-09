@@ -1,8 +1,8 @@
 package me.hsgamer.bettergui.dynamictitle;
 
+import me.hsgamer.bettergui.api.menu.Menu;
 import me.hsgamer.bettergui.builder.InventoryBuilder;
 import me.hsgamer.bettergui.util.MapUtil;
-import me.hsgamer.bettergui.util.StringReplacerApplier;
 import me.hsgamer.hscore.bukkit.addon.PluginAddon;
 import me.hsgamer.hscore.bukkit.gui.GUIDisplay;
 import me.hsgamer.hscore.bukkit.gui.GUIHolder;
@@ -31,7 +31,9 @@ public final class DynamicTitle extends PluginAddon implements Listener {
 
     @Override
     public void onEnable() {
-        InventoryBuilder.INSTANCE.register(map -> {
+        InventoryBuilder.INSTANCE.register(pair -> {
+            Menu menu = pair.getKey();
+            Map<String, Object> map = pair.getValue();
             long period = Optional.ofNullable(MapUtil.getIfFound(map, "title-period", "title-update"))
                     .map(String::valueOf)
                     .map(Long::parseLong)
@@ -39,7 +41,7 @@ public final class DynamicTitle extends PluginAddon implements Listener {
             List<String> template = Optional.ofNullable(MapUtil.getIfFound(map, "title-template"))
                     .map(o -> CollectionUtils.createStringListFromObject(o, false))
                     .orElse(Collections.singletonList(ORIGINAL_KEY));
-            InventoryUpdateData data = new InventoryUpdateData(period, template);
+            InventoryUpdateData data = new InventoryUpdateData(period, template, menu);
 
             return (display, uuid) -> {
                 GUIHolder holder = display.getHolder();
@@ -110,11 +112,9 @@ public final class DynamicTitle extends PluginAddon implements Listener {
                     currentIndex = 0;
                 }
                 String title = data.template.get(currentIndex);
-                if (title.equals(ORIGINAL_KEY)) {
-                    title = display.getHolder().getTitle(player.getUniqueId());
-                } else {
-                    title = StringReplacerApplier.replace(title, player.getUniqueId(), true);
-                }
+                String originalTitle = display.getHolder().getTitle(player.getUniqueId());
+                title = title.replace(ORIGINAL_KEY, originalTitle);
+                title = data.menu.replace(title, player.getUniqueId());
                 InventoryUpdate.updateInventory(player, title);
             }
         };
@@ -124,10 +124,12 @@ public final class DynamicTitle extends PluginAddon implements Listener {
     private static final class InventoryUpdateData {
         private final long period;
         private final List<String> template;
+        private final Menu menu;
 
-        private InventoryUpdateData(long period, List<String> template) {
+        private InventoryUpdateData(long period, List<String> template, Menu menu) {
             this.period = period;
             this.template = template;
+            this.menu = menu;
         }
     }
 }

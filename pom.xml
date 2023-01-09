@@ -11,13 +11,14 @@
   </parent>
 
   <artifactId>DynamicTitle</artifactId>
-  <version>1.0</version>
+  <version>1.1</version>
   <packaging>jar</packaging>
 
   <name>DynamicTitle</name>
   <description>An addon to enable refreshing inventory title</description>
 
   <properties>
+    <plugin.version>7.4</plugin.version>
     <project.mainClass>me.hsgamer.bettergui.dynamictitle.DynamicTitle</project.mainClass>
   </properties>
 
