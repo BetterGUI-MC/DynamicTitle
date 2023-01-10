@@ -39,39 +39,44 @@ import java.util.Set;
  * A utility class for update the inventory of a player.
  * This is useful to change the title of an inventory.
  */
-@SuppressWarnings("ConstantConditions")
 public final class InventoryUpdate {
 
     // Classes.
-    private final static Class<?> CRAFT_PLAYER;
-    private final static Class<?> CHAT_MESSAGE;
-    private final static Class<?> PACKET_PLAY_OUT_OPEN_WINDOW;
-    private final static Class<?> I_CHAT_BASE_COMPONENT;
-    private final static Class<?> CONTAINER;
-    private final static Class<?> CONTAINERS;
-    private final static Class<?> ENTITY_PLAYER;
-    private final static Class<?> I_CHAT_MUTABLE_COMPONENT;
+    private static final Class<?> CRAFT_PLAYER;
+    private static final Class<?> CHAT_MESSAGE;
+    private static final Class<?> PACKET_PLAY_OUT_OPEN_WINDOW;
+    private static final Class<?> I_CHAT_BASE_COMPONENT;
+    private static final Class<?> CONTAINER;
+    private static final Class<?> CONTAINERS;
+    private static final Class<?> ENTITY_PLAYER;
+    private static final Class<?> I_CHAT_MUTABLE_COMPONENT;
 
     // Methods.
-    private final static MethodHandle getHandle;
-    private final static MethodHandle getBukkitView;
-    private final static MethodHandle literal;
+    private static final MethodHandle getHandle;
+    private static final MethodHandle getBukkitView;
+    private static final MethodHandle literal;
 
     // Constructors.
-    private final static MethodHandle chatMessage;
-    private final static MethodHandle packetPlayOutOpenWindow;
+    private static final MethodHandle chatMessage;
+    private static final MethodHandle packetPlayOutOpenWindow;
 
     // Fields.
-    private final static MethodHandle activeContainer;
-    private final static MethodHandle windowId;
+    private static final MethodHandle activeContainer;
+    private static final MethodHandle windowId;
 
     // Methods factory.
-    private final static MethodHandles.Lookup LOOKUP = MethodHandles.lookup();
+    private static final MethodHandles.Lookup LOOKUP = MethodHandles.lookup();
 
-    private final static Set<String> UNOPENABLES = Sets.newHashSet("CRAFTING", "CREATIVE", "PLAYER");
+    private static final boolean supports19 = ReflectionUtils.supports(19);
+
+    private static final boolean TWO_ARGS_CHAT_MESSAGE_CONSTRUCTOR = ReflectionUtils.supports(7)
+            && ReflectionUtils.VER < 16;
+
+    private static final Set<String> UNOPENABLES = Sets.newHashSet("CRAFTING", "CREATIVE", "PLAYER");
+
+    private static final Object[] DUMMY_COLOR_MODIFIERS = new Object[0];
 
     static {
-        boolean supports19 = ReflectionUtils.supports(19);
 
         // Initialize classes.
         CRAFT_PLAYER = ReflectionUtils.getCraftClass("entity.CraftPlayer");
@@ -82,20 +87,24 @@ public final class InventoryUpdate {
         CONTAINERS = useContainers() ? ReflectionUtils.getNMSClass("world.inventory", "Containers") : null;
         ENTITY_PLAYER = ReflectionUtils.getNMSClass("server.level", "EntityPlayer");
         CONTAINER = ReflectionUtils.getNMSClass("world.inventory", "Container");
-        I_CHAT_MUTABLE_COMPONENT = supports19 ? ReflectionUtils.getNMSClass("network.chat", "IChatMutableComponent") : null;
+        I_CHAT_MUTABLE_COMPONENT = supports19 ? ReflectionUtils.getNMSClass("network.chat", "IChatMutableComponent")
+                : null;
 
         // Initialize methods.
         getHandle = getMethod(CRAFT_PLAYER, "getHandle", MethodType.methodType(ENTITY_PLAYER));
         getBukkitView = getMethod(CONTAINER, "getBukkitView", MethodType.methodType(InventoryView.class));
-        literal = supports19 ? getMethod(I_CHAT_BASE_COMPONENT, "b", MethodType.methodType(I_CHAT_MUTABLE_COMPONENT, String.class), true) : null;
+        literal = supports19 ? getMethod(I_CHAT_BASE_COMPONENT, "b",
+                MethodType.methodType(I_CHAT_MUTABLE_COMPONENT, String.class), true) : null;
 
         // Initialize constructors.
-        chatMessage = supports19 ? null : getConstructor(CHAT_MESSAGE, String.class);
-        packetPlayOutOpenWindow =
-                (useContainers()) ?
-                        getConstructor(PACKET_PLAY_OUT_OPEN_WINDOW, int.class, CONTAINERS, I_CHAT_BASE_COMPONENT) :
-                        // Older versions use String instead of Containers, and require an int for the inventory size.
-                        getConstructor(PACKET_PLAY_OUT_OPEN_WINDOW, int.class, String.class, I_CHAT_BASE_COMPONENT, int.class);
+        chatMessage = supports19 ? null
+                : TWO_ARGS_CHAT_MESSAGE_CONSTRUCTOR ? getConstructor(CHAT_MESSAGE, String.class, Object[].class)
+                : getConstructor(CHAT_MESSAGE, String.class);
+        packetPlayOutOpenWindow = (useContainers())
+                ? getConstructor(PACKET_PLAY_OUT_OPEN_WINDOW, int.class, CONTAINERS, I_CHAT_BASE_COMPONENT) :
+                // Older versions use String instead of Containers, and require an int for the
+                // inventory size.
+                getConstructor(PACKET_PLAY_OUT_OPEN_WINDOW, int.class, String.class, I_CHAT_BASE_COMPONENT, int.class);
 
         // Initialize fields.
         activeContainer = getField(ENTITY_PLAYER, CONTAINER, "activeContainer", "bV", "bW", "bU", "containerMenu");
@@ -116,17 +125,13 @@ public final class InventoryUpdate {
             Object craftPlayer = CRAFT_PLAYER.cast(player);
             Object entityPlayer = getHandle.invoke(craftPlayer);
 
-            if (newTitle != null && newTitle.length() > 32) {
-                newTitle = newTitle.substring(0, 32);
-            } else if (newTitle == null) newTitle = "";
+            newTitle = newTitle != null && newTitle.length() > 32 ? newTitle.substring(0, 32) : newTitle == null ? ""
+                    : newTitle;
 
             // Create new title.
-            Object title;
-            if (ReflectionUtils.supports(19)) {
-                title = literal.invoke(newTitle);
-            } else {
-                title = chatMessage.invoke(newTitle);
-            }
+            Object title = supports19 ? literal.invoke(newTitle)
+                    : TWO_ARGS_CHAT_MESSAGE_CONSTRUCTOR ? chatMessage.invoke(newTitle, DUMMY_COLOR_MODIFIERS)
+                    : chatMessage.invoke(newTitle);
 
             // Get activeContainer from EntityPlayer.
             Object activeContainer = InventoryUpdate.activeContainer.invoke(entityPlayer);
@@ -159,19 +164,14 @@ public final class InventoryUpdate {
                 return;
             }
 
-            Object object;
-            // Dispensers and droppers use the same container, but in previous versions, use a diferrent minecraft name.
-            if (!useContainers() && container == Containers.GENERIC_3X3) {
-                object = "minecraft:" + type.name().toLowerCase();
-            } else {
-                object = container.getObject();
-            }
+            // Dispensers and droppers use the same container, but in previous versions, use
+            // a diferrent minecraft name.
+            Object object = !useContainers() && container == Containers.GENERIC_3X3
+                    ? "minecraft:" + type.name().toLowerCase() : container.getObject();
 
             // Create packet.
-            Object packet =
-                    (useContainers()) ?
-                            packetPlayOutOpenWindow.invoke(windowId, object, title) :
-                            packetPlayOutOpenWindow.invoke(windowId, object, title, size);
+            Object packet = (useContainers()) ? packetPlayOutOpenWindow.invoke(windowId, object, title)
+                    : packetPlayOutOpenWindow.invoke(windowId, object, title, size);
 
             // Send packet sync.
             ReflectionUtils.sendPacketSync(player, packet);
@@ -273,7 +273,8 @@ public final class InventoryUpdate {
         FURNACE(14, "minecraft:furnace", "FURNACE"),
         HOPPER(14, "minecraft:hopper", "HOPPER"),
         MERCHANT(14, "minecraft:villager", "MERCHANT"),
-        // For an unknown reason, when updating a shulker box, the size of the inventory get a little bigger.
+        // For an unknown reason, when updating a shulker box, the size of the inventory
+        // get a little bigger.
         SHULKER_BOX(14, "minecraft:blue_shulker_box", "SHULKER_BOX"),
 
         // Added in 1.14, so only works with containers.
@@ -283,17 +284,19 @@ public final class InventoryUpdate {
         LECTERN(14, null, "LECTERN"),
         LOOM(14, null, "LOOM"),
         SMOKER(14, null, "SMOKER"),
-        // CARTOGRAPHY in 1.14, CARTOGRAPHY_TABLE in 1.15 & 1.16 (container), handle in getObject().
+        // CARTOGRAPHY in 1.14, CARTOGRAPHY_TABLE in 1.15 & 1.16 (container), handle in
+        // getObject().
         CARTOGRAPHY_TABLE(14, null, "CARTOGRAPHY"),
         STONECUTTER(14, null, "STONECUTTER"),
 
         // Added in 1.14, functional since 1.16.
         SMITHING(16, null, "SMITHING");
 
-        private final static char[] alphabet = "abcdefghijklmnopqrstuvwxyz".toCharArray();
         private final int containerVersion;
         private final String minecraftName;
         private final String[] inventoryTypesNames;
+
+        private static final char[] alphabet = "abcdefghijklmnopqrstuvwxyz".toCharArray();
 
         Containers(int containerVersion, String minecraftName, String... inventoryTypesNames) {
             this.containerVersion = containerVersion;
