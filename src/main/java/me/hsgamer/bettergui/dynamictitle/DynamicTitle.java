@@ -27,7 +27,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public final class DynamicTitle extends PluginAddon implements Listener {
     private static final String ORIGINAL_KEY = "%original%";
-    private final Map<Inventory, InventoryUpdateData> inventoryMap = new IdentityHashMap<>();
+    private final Map<GUIDisplay, InventoryUpdateData> inventoryMap = new IdentityHashMap<>();
     private final Set<BukkitTask> tasks = new HashSet<>();
 
     @Override
@@ -54,7 +54,7 @@ public final class DynamicTitle extends PluginAddon implements Listener {
                         : Bukkit.createInventory(display, type, title);
 
                 if (data.period >= 0) {
-                    inventoryMap.put(inventory, data);
+                    inventoryMap.put(display, data);
                 }
 
                 return inventory;
@@ -89,15 +89,15 @@ public final class DynamicTitle extends PluginAddon implements Listener {
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onInventoryOpen(InventoryOpenEvent event) {
         Inventory inventory = event.getInventory();
-        if (!inventoryMap.containsKey(inventory)) return;
-        InventoryHolder holder = event.getInventory().getHolder();
+        InventoryHolder holder = inventory.getHolder();
         if (!(holder instanceof GUIDisplay)) return;
         GUIDisplay display = (GUIDisplay) holder;
+        if (!inventoryMap.containsKey(display)) return;
         HumanEntity entity = event.getPlayer();
         if (!(entity instanceof Player)) return;
         Player player = (Player) entity;
 
-        InventoryUpdateData data = inventoryMap.get(inventory);
+        InventoryUpdateData data = inventoryMap.get(display);
         BukkitRunnable runnable = new BukkitRunnable() {
             private final AtomicInteger index = new AtomicInteger(0);
 
