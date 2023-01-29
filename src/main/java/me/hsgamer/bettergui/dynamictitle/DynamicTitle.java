@@ -5,9 +5,9 @@ import me.hsgamer.bettergui.builder.InventoryBuilder;
 import me.hsgamer.bettergui.util.MapUtil;
 import me.hsgamer.bettergui.util.StringReplacerApplier;
 import me.hsgamer.hscore.bukkit.addon.PluginAddon;
-import me.hsgamer.hscore.bukkit.gui.GUIDisplay;
-import me.hsgamer.hscore.bukkit.gui.GUIHolder;
-import me.hsgamer.hscore.bukkit.gui.GUIUtils;
+import me.hsgamer.hscore.bukkit.gui.BukkitGUIDisplay;
+import me.hsgamer.hscore.bukkit.gui.BukkitGUIHolder;
+import me.hsgamer.hscore.bukkit.gui.BukkitGUIUtils;
 import me.hsgamer.hscore.common.CollectionUtils;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.HumanEntity;
@@ -27,7 +27,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public final class DynamicTitle extends PluginAddon implements Listener {
     private static final String ORIGINAL_KEY = "%original%";
-    private final Map<GUIDisplay, InventoryUpdateData> inventoryMap = new IdentityHashMap<>();
+    private final Map<BukkitGUIDisplay, InventoryUpdateData> inventoryMap = new IdentityHashMap<>();
     private final Set<BukkitTask> tasks = new HashSet<>();
 
     @Override
@@ -45,12 +45,12 @@ public final class DynamicTitle extends PluginAddon implements Listener {
             InventoryUpdateData data = new InventoryUpdateData(period, template, menu);
 
             return (display, uuid) -> {
-                GUIHolder holder = display.getHolder();
+                BukkitGUIHolder holder = display.getHolder();
                 InventoryType type = holder.getInventoryType();
                 int size = holder.getSize(uuid);
                 String title = holder.getTitle(uuid);
                 Inventory inventory = type == InventoryType.CHEST && size > 0
-                        ? Bukkit.createInventory(display, GUIUtils.normalizeToChestSize(size), title)
+                        ? Bukkit.createInventory(display, BukkitGUIUtils.normalizeToChestSize(size), title)
                         : Bukkit.createInventory(display, type, title);
 
                 if (data.period >= 0) {
@@ -90,8 +90,8 @@ public final class DynamicTitle extends PluginAddon implements Listener {
     public void onInventoryOpen(InventoryOpenEvent event) {
         Inventory inventory = event.getInventory();
         InventoryHolder holder = inventory.getHolder();
-        if (!(holder instanceof GUIDisplay)) return;
-        GUIDisplay display = (GUIDisplay) holder;
+        if (!(holder instanceof BukkitGUIDisplay)) return;
+        BukkitGUIDisplay display = (BukkitGUIDisplay) holder;
         if (!inventoryMap.containsKey(display)) return;
         HumanEntity entity = event.getPlayer();
         if (!(entity instanceof Player)) return;
