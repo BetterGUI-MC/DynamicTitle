@@ -8,6 +8,8 @@ import me.hsgamer.hscore.bukkit.addon.PluginAddon;
 import me.hsgamer.hscore.bukkit.gui.BukkitGUIDisplay;
 import me.hsgamer.hscore.bukkit.gui.BukkitGUIHolder;
 import me.hsgamer.hscore.bukkit.gui.BukkitGUIUtils;
+import me.hsgamer.hscore.bukkit.scheduler.Scheduler;
+import me.hsgamer.hscore.bukkit.scheduler.Task;
 import me.hsgamer.hscore.common.CollectionUtils;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.HumanEntity;
@@ -19,16 +21,15 @@ import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
-import org.bukkit.scheduler.BukkitRunnable;
-import org.bukkit.scheduler.BukkitTask;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BooleanSupplier;
 
 public final class DynamicTitle extends PluginAddon implements Listener {
     private static final String ORIGINAL_KEY = "%original%";
     private final Map<BukkitGUIDisplay, InventoryUpdateData> inventoryMap = new IdentityHashMap<>();
-    private final Set<BukkitTask> tasks = new HashSet<>();
+    private final Set<Task> tasks = new HashSet<>();
 
     @Override
     public void onEnable() {
@@ -98,14 +99,13 @@ public final class DynamicTitle extends PluginAddon implements Listener {
         Player player = (Player) entity;
 
         InventoryUpdateData data = inventoryMap.get(display);
-        BukkitRunnable runnable = new BukkitRunnable() {
+        BooleanSupplier runnable = new BooleanSupplier() {
             private final AtomicInteger index = new AtomicInteger(0);
 
             @Override
-            public void run() {
+            public boolean getAsBoolean() {
                 if (!player.isOnline() || !player.isValid() || player.getOpenInventory().getTopInventory() != inventory) {
-                    cancel();
-                    return;
+                    return false;
                 }
                 int currentIndex = index.getAndIncrement();
                 if (currentIndex >= data.template.size()) {
@@ -117,9 +117,10 @@ public final class DynamicTitle extends PluginAddon implements Listener {
                 title = title.replace(ORIGINAL_KEY, originalTitle);
                 title = StringReplacerApplier.replace(title, player.getUniqueId(), data.menu);
                 InventoryUpdate.updateInventory(player, title);
+                return true;
             }
         };
-        tasks.add(runnable.runTaskTimer(getPlugin(), 0, data.period));
+        tasks.add(Scheduler.CURRENT.runEntityTaskTimer(getPlugin(), player, runnable, 0, data.period, false));
     }
 
     private static final class InventoryUpdateData {

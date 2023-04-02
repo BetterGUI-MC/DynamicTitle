@@ -7,18 +7,17 @@
   <parent>
     <groupId>me.hsgamer.bettergui</groupId>
     <artifactId>addon-parent</artifactId>
-    <version>2.1</version>
+    <version>2.2</version>
   </parent>
 
   <artifactId>DynamicTitle</artifactId>
-  <version>2.1</version>
+  <version>2.2</version>
   <packaging>jar</packaging>
 
   <name>DynamicTitle</name>
   <description>An addon to enable refreshing inventory title</description>
 
   <properties>
-    <plugin.version>8.6</plugin.version>
     <project.mainClass>me.hsgamer.bettergui.dynamictitle.DynamicTitle</project.mainClass>
   </properties>
 
