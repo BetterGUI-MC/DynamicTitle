@@ -1,16 +1,17 @@
 package me.hsgamer.bettergui.dynamictitle;
 
+import me.hsgamer.bettergui.api.addon.GetPlugin;
+import me.hsgamer.bettergui.api.addon.Reloadable;
 import me.hsgamer.bettergui.api.menu.Menu;
 import me.hsgamer.bettergui.builder.InventoryBuilder;
-import me.hsgamer.bettergui.util.MapUtil;
 import me.hsgamer.bettergui.util.StringReplacerApplier;
-import me.hsgamer.hscore.bukkit.addon.PluginAddon;
 import me.hsgamer.hscore.bukkit.gui.BukkitGUIDisplay;
-import me.hsgamer.hscore.bukkit.gui.BukkitGUIHolder;
 import me.hsgamer.hscore.bukkit.gui.BukkitGUIUtils;
 import me.hsgamer.hscore.bukkit.scheduler.Scheduler;
 import me.hsgamer.hscore.bukkit.scheduler.Task;
 import me.hsgamer.hscore.common.CollectionUtils;
+import me.hsgamer.hscore.common.MapUtils;
+import me.hsgamer.hscore.expansion.common.Expansion;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.HumanEntity;
 import org.bukkit.entity.Player;
@@ -18,17 +19,17 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryOpenEvent;
-import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
+import org.bukkit.inventory.InventoryView;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
 
-public final class DynamicTitle extends PluginAddon implements Listener {
+public final class DynamicTitle implements Expansion, GetPlugin, Reloadable, Listener {
     private static final String ORIGINAL_KEY = "%original%";
-    private final Map<BukkitGUIDisplay, InventoryUpdateData> inventoryMap = new IdentityHashMap<>();
+    private final Map<Inventory, InventoryUpdateData> inventoryMap = new IdentityHashMap<>();
     private final Set<Task> tasks = new HashSet<>();
 
     @Override
@@ -36,30 +37,26 @@ public final class DynamicTitle extends PluginAddon implements Listener {
         InventoryBuilder.INSTANCE.register(pair -> {
             Menu menu = pair.getKey();
             Map<String, Object> map = pair.getValue();
-            long period = Optional.ofNullable(MapUtil.getIfFound(map, "title-period", "title-update"))
+            long period = Optional.ofNullable(MapUtils.getIfFound(map, "title-period", "title-update"))
                     .map(String::valueOf)
                     .map(Long::parseLong)
                     .orElse(0L);
-            List<String> template = Optional.ofNullable(MapUtil.getIfFound(map, "title-template"))
+            List<String> template = Optional.ofNullable(MapUtils.getIfFound(map, "title-template"))
                     .map(o -> CollectionUtils.createStringListFromObject(o, false))
                     .orElse(Collections.singletonList(ORIGINAL_KEY));
             InventoryUpdateData data = new InventoryUpdateData(period, template, menu);
 
-            return (display, uuid) -> {
-                BukkitGUIHolder holder = display.getHolder();
-                InventoryType type = holder.getInventoryType();
-                int size = holder.getSize(uuid);
-                String title = holder.getTitle(uuid);
-                Inventory inventory = type == InventoryType.CHEST && size > 0
-                        ? Bukkit.createInventory(display, BukkitGUIUtils.normalizeToChestSize(size), title)
-                        : Bukkit.createInventory(display, type, title);
+            String title = Optional.ofNullable(MapUtils.getIfFound(map, "name", "title"))
+                    .map(String::valueOf)
+                    .orElse("");
 
-                if (data.period >= 0) {
-                    inventoryMap.put(display, data);
-                }
-
-                return inventory;
-            };
+            return BukkitGUIUtils.getInventoryFunctionFromTitle(uuid -> StringReplacerApplier.replace(title, uuid, menu))
+                    .andThen(inventory -> {
+                        if (data.period >= 0) {
+                            inventoryMap.put(inventory, data);
+                        }
+                        return inventory;
+                    });
         }, "dynamic-title");
 
         Bukkit.getPluginManager().registerEvents(this, getPlugin());
@@ -92,19 +89,18 @@ public final class DynamicTitle extends PluginAddon implements Listener {
         Inventory inventory = event.getInventory();
         InventoryHolder holder = inventory.getHolder();
         if (!(holder instanceof BukkitGUIDisplay)) return;
-        BukkitGUIDisplay display = (BukkitGUIDisplay) holder;
-        if (!inventoryMap.containsKey(display)) return;
         HumanEntity entity = event.getPlayer();
         if (!(entity instanceof Player)) return;
         Player player = (Player) entity;
 
-        InventoryUpdateData data = inventoryMap.get(display);
+        InventoryUpdateData data = inventoryMap.get(inventory);
         BooleanSupplier runnable = new BooleanSupplier() {
             private final AtomicInteger index = new AtomicInteger(0);
 
             @Override
             public boolean getAsBoolean() {
-                if (!player.isOnline() || !player.isValid() || player.getOpenInventory().getTopInventory() != inventory) {
+                InventoryView view = player.getOpenInventory();
+                if (!player.isOnline() || !player.isValid() || view.getTopInventory() != inventory) {
                     return false;
                 }
                 int currentIndex = index.getAndIncrement();
@@ -113,14 +109,14 @@ public final class DynamicTitle extends PluginAddon implements Listener {
                     currentIndex = 0;
                 }
                 String title = data.template.get(currentIndex);
-                String originalTitle = display.getHolder().getTitle(player.getUniqueId());
+                String originalTitle = view.getOriginalTitle();
                 title = title.replace(ORIGINAL_KEY, originalTitle);
                 title = StringReplacerApplier.replace(title, player.getUniqueId(), data.menu);
-                InventoryUpdate.updateInventory(player, title);
+                view.setTitle(title);
                 return true;
             }
         };
-        tasks.add(Scheduler.CURRENT.runEntityTaskTimer(getPlugin(), player, runnable, 0, data.period, false));
+        tasks.add(Scheduler.current().sync().runEntityTaskTimer(player, runnable, 0, data.period));
     }
 
     private static final class InventoryUpdateData {
