@@ -94,6 +94,7 @@ public final class DynamicTitle implements Expansion, GetPlugin, Reloadable, Lis
         Player player = (Player) entity;
 
         InventoryUpdateData data = inventoryMap.get(inventory);
+        if (data == null) return;
         BooleanSupplier runnable = new BooleanSupplier() {
             private final AtomicInteger index = new AtomicInteger(0);
 
