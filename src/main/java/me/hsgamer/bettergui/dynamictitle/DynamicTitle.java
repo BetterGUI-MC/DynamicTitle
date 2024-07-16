@@ -1,14 +1,14 @@
 package me.hsgamer.bettergui.dynamictitle;
 
+import io.github.projectunified.minelib.scheduler.common.task.Task;
 import me.hsgamer.bettergui.api.addon.GetPlugin;
 import me.hsgamer.bettergui.api.addon.Reloadable;
 import me.hsgamer.bettergui.api.menu.Menu;
 import me.hsgamer.bettergui.builder.InventoryBuilder;
+import me.hsgamer.bettergui.util.SchedulerUtil;
 import me.hsgamer.bettergui.util.StringReplacerApplier;
 import me.hsgamer.hscore.bukkit.gui.BukkitGUIDisplay;
 import me.hsgamer.hscore.bukkit.gui.BukkitGUIUtils;
-import me.hsgamer.hscore.bukkit.scheduler.Scheduler;
-import me.hsgamer.hscore.bukkit.scheduler.Task;
 import me.hsgamer.hscore.common.CollectionUtils;
 import me.hsgamer.hscore.common.MapUtils;
 import me.hsgamer.hscore.expansion.common.Expansion;
@@ -117,7 +117,7 @@ public final class DynamicTitle implements Expansion, GetPlugin, Reloadable, Lis
                 return true;
             }
         };
-        tasks.add(Scheduler.current().sync().runEntityTaskTimer(player, runnable, 0, data.period));
+        tasks.add(SchedulerUtil.entity(player).runTimer(runnable, 0, data.period));
     }
 
     private static final class InventoryUpdateData {
