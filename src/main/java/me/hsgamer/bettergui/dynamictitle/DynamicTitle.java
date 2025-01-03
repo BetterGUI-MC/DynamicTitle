@@ -21,7 +21,6 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
-import org.bukkit.inventory.InventoryView;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -100,8 +99,8 @@ public final class DynamicTitle implements Expansion, GetPlugin, Reloadable, Lis
 
             @Override
             public boolean getAsBoolean() {
-                InventoryView view = player.getOpenInventory();
-                if (!player.isOnline() || !player.isValid() || view.getTopInventory() != inventory) {
+                Object view = player.getOpenInventory();
+                if (!player.isOnline() || !player.isValid() || InventoryViewUtil.getTopInventory(view) != inventory) {
                     return false;
                 }
                 int currentIndex = index.getAndIncrement();
@@ -110,10 +109,10 @@ public final class DynamicTitle implements Expansion, GetPlugin, Reloadable, Lis
                     currentIndex = 0;
                 }
                 String title = data.template.get(currentIndex);
-                String originalTitle = view.getOriginalTitle();
+                String originalTitle = InventoryViewUtil.getOriginalTitle(view);
                 title = title.replace(ORIGINAL_KEY, originalTitle);
                 title = StringReplacerApplier.replace(title, player.getUniqueId(), data.menu);
-                view.setTitle(title);
+                InventoryViewUtil.setTitle(view, title);
                 return true;
             }
         };
